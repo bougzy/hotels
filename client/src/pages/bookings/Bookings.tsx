@@ -8,6 +8,7 @@ import {
   CardContent,
   Badge,
   Input,
+  Label,
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -16,6 +17,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import {
@@ -115,6 +122,86 @@ export function BookingsPage() {
   // Modal states
   const [checkInBooking, setCheckInBooking] = useState<Booking | null>(null);
   const [checkOutBooking, setCheckOutBooking] = useState<Booking | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  // New booking form state
+  const [newBooking, setNewBooking] = useState({
+    roomTypeId: '',
+    guestId: '',
+    checkInDate: '',
+    checkOutDate: '',
+    adults: 1,
+    children: 0,
+    channel: 'direct',
+    notes: '',
+    // For creating new guest inline
+    createNewGuest: false,
+    newGuest: {
+      firstName: '',
+      lastName: '',
+      phone: '',
+      email: '',
+    },
+  });
+
+  // Fetch room types for booking form
+  const { data: roomTypesData } = useQuery({
+    queryKey: ['roomTypes', hotel?._id],
+    queryFn: () => apiClient.get<RoomType[]>(`/rooms/types?hotelId=${hotel?._id}`),
+    enabled: !!hotel?._id,
+  });
+
+  // Fetch guests for booking form
+  const { data: guestsData } = useQuery({
+    queryKey: ['guestsForBooking', hotel?._id],
+    queryFn: () => apiClient.get<{ guests: Guest[] }>(`/guests?hotelId=${hotel?._id}&limit=100`),
+    enabled: !!hotel?._id,
+  });
+
+  const roomTypes = roomTypesData?.data || [];
+  const guestsList = guestsData?.data?.guests || [];
+
+  // Create booking mutation
+  const createBookingMutation = useMutation({
+    mutationFn: async (data: typeof newBooking) => {
+      // If creating new guest, we need to pass guest info inline
+      const payload: Record<string, unknown> = {
+        roomTypeId: data.roomTypeId,
+        checkInDate: data.checkInDate,
+        checkOutDate: data.checkOutDate,
+        adults: data.adults,
+        children: data.children,
+        channel: data.channel,
+        notes: data.notes,
+      };
+
+      if (data.createNewGuest) {
+        payload.guest = data.newGuest;
+      } else {
+        payload.guestId = data.guestId;
+      }
+
+      return apiClient.post(`/bookings?hotelId=${hotel?._id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['todayOperations'] });
+      queryClient.invalidateQueries({ queryKey: ['guests'] });
+      setShowAddModal(false);
+      setNewBooking({
+        roomTypeId: '',
+        guestId: '',
+        checkInDate: '',
+        checkOutDate: '',
+        adults: 1,
+        children: 0,
+        channel: 'direct',
+        notes: '',
+        createNewGuest: false,
+        newGuest: { firstName: '', lastName: '', phone: '', email: '' },
+      });
+    },
+  });
 
   // Check-in mutation
   const checkInMutation = useMutation({
@@ -213,7 +300,7 @@ export function BookingsPage() {
             Manage reservations and guest check-ins
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setShowAddModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Booking
         </Button>
@@ -572,6 +659,239 @@ export function BookingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* New Booking Modal */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Booking</DialogTitle>
+            <DialogDescription>
+              Fill in the booking details below
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Room Type Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="roomType">Room Type *</Label>
+              <select
+                id="roomType"
+                className="w-full h-10 px-3 border rounded-md bg-background"
+                value={newBooking.roomTypeId}
+                onChange={(e) => setNewBooking({ ...newBooking, roomTypeId: e.target.value })}
+              >
+                <option value="">Select a room type</option>
+                {roomTypes.map((type) => (
+                  <option key={type._id} value={type._id}>
+                    {type.name} - {formatCurrency(type.pricing?.basePrice || 0)}/night
+                  </option>
+                ))}
+              </select>
+              {roomTypes.length === 0 && (
+                <p className="text-xs text-orange-600">
+                  No room types available. Please create room types first.
+                </p>
+              )}
+            </div>
+
+            {/* Guest Selection or Creation */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Guest *</Label>
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() => setNewBooking({
+                    ...newBooking,
+                    createNewGuest: !newBooking.createNewGuest,
+                    guestId: '',
+                  })}
+                >
+                  {newBooking.createNewGuest ? 'Select existing guest' : 'Create new guest'}
+                </button>
+              </div>
+
+              {newBooking.createNewGuest ? (
+                <div className="space-y-3 p-3 border rounded-md bg-muted/30">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="firstName" className="text-xs">First Name *</Label>
+                      <Input
+                        id="firstName"
+                        placeholder="John"
+                        value={newBooking.newGuest.firstName}
+                        onChange={(e) => setNewBooking({
+                          ...newBooking,
+                          newGuest: { ...newBooking.newGuest, firstName: e.target.value }
+                        })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="lastName" className="text-xs">Last Name *</Label>
+                      <Input
+                        id="lastName"
+                        placeholder="Doe"
+                        value={newBooking.newGuest.lastName}
+                        onChange={(e) => setNewBooking({
+                          ...newBooking,
+                          newGuest: { ...newBooking.newGuest, lastName: e.target.value }
+                        })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="phone" className="text-xs">Phone *</Label>
+                    <Input
+                      id="phone"
+                      placeholder="+1234567890"
+                      value={newBooking.newGuest.phone}
+                      onChange={(e) => setNewBooking({
+                        ...newBooking,
+                        newGuest: { ...newBooking.newGuest, phone: e.target.value }
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="email" className="text-xs">Email (optional)</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={newBooking.newGuest.email}
+                      onChange={(e) => setNewBooking({
+                        ...newBooking,
+                        newGuest: { ...newBooking.newGuest, email: e.target.value }
+                      })}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <select
+                  className="w-full h-10 px-3 border rounded-md bg-background"
+                  value={newBooking.guestId}
+                  onChange={(e) => setNewBooking({ ...newBooking, guestId: e.target.value })}
+                >
+                  <option value="">Select a guest</option>
+                  {guestsList.map((guest) => (
+                    <option key={guest._id} value={guest._id}>
+                      {guest.firstName} {guest.lastName} - {guest.phone}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Dates */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="checkInDate">Check-in Date *</Label>
+                <Input
+                  id="checkInDate"
+                  type="date"
+                  value={newBooking.checkInDate}
+                  onChange={(e) => setNewBooking({ ...newBooking, checkInDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="checkOutDate">Check-out Date *</Label>
+                <Input
+                  id="checkOutDate"
+                  type="date"
+                  value={newBooking.checkOutDate}
+                  min={newBooking.checkInDate}
+                  onChange={(e) => setNewBooking({ ...newBooking, checkOutDate: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Occupancy */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="adults">Adults</Label>
+                <Input
+                  id="adults"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={newBooking.adults}
+                  onChange={(e) => setNewBooking({ ...newBooking, adults: parseInt(e.target.value) || 1 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="children">Children</Label>
+                <Input
+                  id="children"
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={newBooking.children}
+                  onChange={(e) => setNewBooking({ ...newBooking, children: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+
+            {/* Channel */}
+            <div className="space-y-2">
+              <Label htmlFor="channel">Booking Channel</Label>
+              <select
+                id="channel"
+                className="w-full h-10 px-3 border rounded-md bg-background"
+                value={newBooking.channel}
+                onChange={(e) => setNewBooking({ ...newBooking, channel: e.target.value })}
+              >
+                <option value="direct">Direct</option>
+                <option value="booking.com">Booking.com</option>
+                <option value="expedia">Expedia</option>
+                <option value="airbnb">Airbnb</option>
+                <option value="phone">Phone</option>
+                <option value="walk-in">Walk-in</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes (optional)</Label>
+              <Input
+                id="notes"
+                placeholder="Special requests or notes..."
+                value={newBooking.notes}
+                onChange={(e) => setNewBooking({ ...newBooking, notes: e.target.value })}
+              />
+            </div>
+
+            {createBookingMutation.isError && (
+              <p className="text-sm text-red-600">
+                Failed to create booking. Please check all fields and try again.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createBookingMutation.mutate(newBooking)}
+              disabled={
+                !newBooking.roomTypeId ||
+                !newBooking.checkInDate ||
+                !newBooking.checkOutDate ||
+                (!newBooking.guestId && !newBooking.createNewGuest) ||
+                (newBooking.createNewGuest && (!newBooking.newGuest.firstName || !newBooking.newGuest.lastName || !newBooking.newGuest.phone)) ||
+                createBookingMutation.isPending
+              }
+            >
+              {createBookingMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Booking'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

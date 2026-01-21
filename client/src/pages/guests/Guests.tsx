@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import {
@@ -8,6 +8,13 @@ import {
   CardContent,
   Badge,
   Input,
+  Label,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui';
 import { formatCurrency, cn } from '@/lib/utils';
 import {
@@ -67,8 +74,48 @@ interface Guest {
 
 export function GuestsPage() {
   const { hotel } = useAuthStore();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'vip' | 'blacklisted'>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  // New guest form state
+  const [newGuest, setNewGuest] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    email: '',
+    dateOfBirth: '',
+    nationality: '',
+    idType: '',
+    idNumber: '',
+    address: {
+      street: '',
+      city: '',
+      country: '',
+    },
+  });
+
+  // Create guest mutation
+  const createGuestMutation = useMutation({
+    mutationFn: (data: typeof newGuest) =>
+      apiClient.post(`/guests?hotelId=${hotel?._id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['guests'] });
+      setShowAddModal(false);
+      setNewGuest({
+        firstName: '',
+        lastName: '',
+        phone: '',
+        email: '',
+        dateOfBirth: '',
+        nationality: '',
+        idType: '',
+        idNumber: '',
+        address: { street: '', city: '', country: '' },
+      });
+    },
+  });
 
   // Fetch guests
   const { data: guestsData, isLoading } = useQuery({
@@ -95,7 +142,7 @@ export function GuestsPage() {
             Manage your guest database and history
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setShowAddModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Guest
         </Button>
@@ -264,6 +311,185 @@ export function GuestsPage() {
           ))}
         </div>
       )}
+
+      {/* Add Guest Modal */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Guest</DialogTitle>
+            <DialogDescription>
+              Create a new guest profile
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Basic Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name *</Label>
+                <Input
+                  id="firstName"
+                  placeholder="John"
+                  value={newGuest.firstName}
+                  onChange={(e) => setNewGuest({ ...newGuest, firstName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name *</Label>
+                <Input
+                  id="lastName"
+                  placeholder="Doe"
+                  value={newGuest.lastName}
+                  onChange={(e) => setNewGuest({ ...newGuest, lastName: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number *</Label>
+              <Input
+                id="phone"
+                placeholder="+1234567890"
+                value={newGuest.phone}
+                onChange={(e) => setNewGuest({ ...newGuest, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email (optional)</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={newGuest.email}
+                onChange={(e) => setNewGuest({ ...newGuest, email: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                <Input
+                  id="dateOfBirth"
+                  type="date"
+                  value={newGuest.dateOfBirth}
+                  onChange={(e) => setNewGuest({ ...newGuest, dateOfBirth: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nationality">Nationality</Label>
+                <Input
+                  id="nationality"
+                  placeholder="e.g., American"
+                  value={newGuest.nationality}
+                  onChange={(e) => setNewGuest({ ...newGuest, nationality: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* ID Information */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="idType">ID Type</Label>
+                <select
+                  id="idType"
+                  className="w-full h-10 px-3 border rounded-md bg-background"
+                  value={newGuest.idType}
+                  onChange={(e) => setNewGuest({ ...newGuest, idType: e.target.value })}
+                >
+                  <option value="">Select ID type</option>
+                  <option value="passport">Passport</option>
+                  <option value="national_id">National ID</option>
+                  <option value="drivers_license">Driver's License</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="idNumber">ID Number</Label>
+                <Input
+                  id="idNumber"
+                  placeholder="ID number"
+                  value={newGuest.idNumber}
+                  onChange={(e) => setNewGuest({ ...newGuest, idNumber: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Address (optional)</Label>
+              <div className="space-y-3 p-3 border rounded-md bg-muted/30">
+                <div className="space-y-2">
+                  <Label htmlFor="street" className="text-xs">Street</Label>
+                  <Input
+                    id="street"
+                    placeholder="123 Main St"
+                    value={newGuest.address.street}
+                    onChange={(e) => setNewGuest({
+                      ...newGuest,
+                      address: { ...newGuest.address, street: e.target.value }
+                    })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-xs">City</Label>
+                    <Input
+                      id="city"
+                      placeholder="New York"
+                      value={newGuest.address.city}
+                      onChange={(e) => setNewGuest({
+                        ...newGuest,
+                        address: { ...newGuest.address, city: e.target.value }
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country" className="text-xs">Country</Label>
+                    <Input
+                      id="country"
+                      placeholder="USA"
+                      value={newGuest.address.country}
+                      onChange={(e) => setNewGuest({
+                        ...newGuest,
+                        address: { ...newGuest.address, country: e.target.value }
+                      })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {createGuestMutation.isError && (
+              <p className="text-sm text-red-600">
+                Failed to create guest. Please check all fields and try again.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createGuestMutation.mutate(newGuest)}
+              disabled={
+                !newGuest.firstName ||
+                !newGuest.lastName ||
+                !newGuest.phone ||
+                createGuestMutation.isPending
+              }
+            >
+              {createGuestMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Guest'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
