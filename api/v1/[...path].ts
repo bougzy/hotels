@@ -4,6 +4,11 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import mongoose from 'mongoose';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Create Express app
 const app = express();
@@ -54,16 +59,36 @@ let routesLoaded = false;
 async function loadRoutes() {
   if (routesLoaded) return;
 
-  // Dynamic import of compiled server routes
-  const { apiRoutes } = await import('../../server/dist/routes/index.js');
-  const { errorHandler, notFoundHandler } = await import('../../server/dist/middleware/index.js');
+  try {
+    // Try multiple import paths for Vercel compatibility
+    let apiRoutes, errorHandler, notFoundHandler;
 
-  // Mount at /api/v1 since Vercel routes /api/v1/* to this handler
-  app.use('/api/v1', apiRoutes);
-  app.use(notFoundHandler);
-  app.use(errorHandler);
+    try {
+      // Path when running in Vercel
+      const routesModule = await import(path.join(__dirname, '../../server/dist/routes/index.js'));
+      const middlewareModule = await import(path.join(__dirname, '../../server/dist/middleware/index.js'));
+      apiRoutes = routesModule.apiRoutes;
+      errorHandler = middlewareModule.errorHandler;
+      notFoundHandler = middlewareModule.notFoundHandler;
+    } catch (e) {
+      // Fallback: direct relative import
+      const routesModule = await import('../../server/dist/routes/index.js');
+      const middlewareModule = await import('../../server/dist/middleware/index.js');
+      apiRoutes = routesModule.apiRoutes;
+      errorHandler = middlewareModule.errorHandler;
+      notFoundHandler = middlewareModule.notFoundHandler;
+    }
 
-  routesLoaded = true;
+    // Mount at /api/v1
+    app.use('/api/v1', apiRoutes);
+    app.use(notFoundHandler);
+    app.use(errorHandler);
+
+    routesLoaded = true;
+  } catch (error) {
+    console.error('Failed to load routes:', error);
+    throw error;
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -82,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      error: process.env.NODE_ENV !== 'production' ? String(error) : undefined
+      error: String(error)
     });
   }
 }
