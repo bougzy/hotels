@@ -264,8 +264,7 @@ const HotelSchema = new Schema<IHotel>(
 );
 
 // Indexes for performance
-HotelSchema.index({ slug: 1 });
-HotelSchema.index({ code: 1 });
+// Note: slug and code already have unique: true which creates indexes
 HotelSchema.index({ ownerId: 1 });
 HotelSchema.index({ 'contact.address.city': 1, 'contact.address.country': 1 });
 HotelSchema.index({ isActive: 1, 'subscription.status': 1 });

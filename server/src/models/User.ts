@@ -142,7 +142,7 @@ const UserSchema = new Schema<IUser>(
 );
 
 // Indexes
-UserSchema.index({ email: 1 });
+// Note: email already has unique: true which creates an index
 UserSchema.index({ 'hotels.hotelId': 1 });
 UserSchema.index({ isActive: 1 });
 

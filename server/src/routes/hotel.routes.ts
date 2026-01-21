@@ -18,6 +18,29 @@ import * as authService from '../services/auth.service.js';
 
 const router = Router();
 
+// ==================== PUBLIC ROUTES (for booking widget) ====================
+
+/**
+ * GET /hotels/public/:slug
+ * Get public hotel info by slug - for booking widget
+ */
+router.get(
+  '/public/:slug',
+  asyncHandler(async (req, res) => {
+    const hotel = await Hotel.findOne({
+      slug: req.params.slug,
+      isActive: true,
+    }).select('name slug type starRating contact branding settings.currency settings.checkInTime settings.checkOutTime amenities');
+
+    if (!hotel) {
+      throw ApiError.notFound('Hotel not found');
+    }
+
+    return ApiResponse.success(res, hotel);
+  })
+);
+
+// ==================== PROTECTED ROUTES ====================
 router.use(authenticate);
 
 /**

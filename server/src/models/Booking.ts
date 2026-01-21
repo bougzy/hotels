@@ -306,13 +306,12 @@ const BookingSchema = new Schema<IBooking>(
 );
 
 // Indexes for common queries
+// Note: bookingCode and confirmationCode already have unique: true which creates indexes
 BookingSchema.index({ hotelId: 1, status: 1 });
 BookingSchema.index({ hotelId: 1, checkInDate: 1 });
 BookingSchema.index({ hotelId: 1, checkOutDate: 1 });
 BookingSchema.index({ hotelId: 1, createdAt: -1 });
 BookingSchema.index({ roomId: 1, checkInDate: 1, checkOutDate: 1 });
-BookingSchema.index({ bookingCode: 1 });
-BookingSchema.index({ confirmationCode: 1 });
 BookingSchema.index({ 'channelDetails.otaBookingId': 1 }, { sparse: true });
 
 // Pre-save hook to calculate nights and balance

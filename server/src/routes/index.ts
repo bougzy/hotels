@@ -4,6 +4,7 @@ import { hotelRoutes } from './hotel.routes.js';
 import { roomRoutes } from './room.routes.js';
 import { bookingRoutes } from './booking.routes.js';
 import { dashboardRoutes } from './dashboard.routes.js';
+import { guestRoutes } from './guest.routes.js';
 
 /**
  * API Route Registration
@@ -29,5 +30,6 @@ router.use('/hotels', hotelRoutes);
 router.use('/rooms', roomRoutes);
 router.use('/bookings', bookingRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/guests', guestRoutes);
 
 export { router as apiRoutes };

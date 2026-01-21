@@ -226,9 +226,9 @@ const GuestSchema = new Schema<IGuest>(
 );
 
 // Indexes for searching guests
+// Note: guestCode already has unique: true which creates an index
+// Note: email has sparse: true in schema definition
 GuestSchema.index({ phone: 1 });
-GuestSchema.index({ email: 1 }, { sparse: true });
-GuestSchema.index({ guestCode: 1 });
 GuestSchema.index({ firstName: 'text', lastName: 'text', email: 'text' });
 GuestSchema.index({ 'hotelHistory.hotelId': 1 });
 GuestSchema.index({ isBlacklisted: 1 });
