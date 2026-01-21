@@ -1,0 +1,33 @@
+{
+  "name": "hhos",
+  "version": "1.0.0",
+  "description": "Hotel & Hospitality Operating System - Revenue-driven SaaS platform",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build": "npm run build:client && npm run build:server",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "lint": "concurrently \"cd server && npm run lint\" \"cd client && npm run lint\"",
+    "test": "concurrently \"cd server && npm test\" \"cd client && npm test\""
+  },
+  "keywords": [
+    "hotel",
+    "hospitality",
+    "pms",
+    "saas",
+    "booking",
+    "revenue-management"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
