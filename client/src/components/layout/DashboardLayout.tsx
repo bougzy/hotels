@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Bell,
   Plus,
+  BarChart3,
 } from 'lucide-react';
 
 /**
@@ -30,6 +31,7 @@ const navigation = [
   { name: 'Bookings', href: '/bookings', icon: Calendar },
   { name: 'Rooms', href: '/rooms', icon: BedDouble },
   { name: 'Guests', href: '/guests', icon: Users },
+  { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

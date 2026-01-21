@@ -10,6 +10,9 @@ import {
 } from '../middleware/index.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import * as bookingService from '../services/booking.service.js';
+import { sendBookingConfirmation } from '../services/notification.service.js';
+import { Hotel, Guest, RoomType, Room } from '../models/index.js';
+import { dateUtils } from '../utils/helpers.js';
 
 /**
  * BOOKING ROUTES
@@ -74,6 +77,34 @@ router.post(
       channel: 'website',
     });
 
+    // Send booking confirmation notification (async, don't block response)
+    try {
+      const hotel = await Hotel.findById(req.body.hotelId);
+      const guest = await Guest.findById(booking.guestId);
+      const roomType = await RoomType.findById(booking.roomTypeId);
+      const room = await Room.findById(booking.roomId);
+
+      if (hotel && guest && roomType) {
+        sendBookingConfirmation({
+          guestName: `${guest.firstName} ${guest.lastName}`,
+          guestPhone: guest.phone,
+          guestEmail: guest.email,
+          hotelName: hotel.name,
+          hotelPhone: hotel.contact?.phone || '',
+          bookingCode: booking.bookingCode,
+          confirmationCode: booking.confirmationCode,
+          roomType: roomType.name,
+          roomNumber: room?.roomNumber,
+          checkInDate: dateUtils.format(booking.checkInDate),
+          checkOutDate: dateUtils.format(booking.checkOutDate),
+          totalAmount: booking.pricing.grandTotal.toLocaleString(),
+          currency: booking.pricing.currency,
+        }).catch(err => console.error('[Notification] Failed to send booking confirmation:', err));
+      }
+    } catch (err) {
+      console.error('[Notification] Error preparing booking confirmation:', err);
+    }
+
     return ApiResponse.created(res, {
       bookingCode: booking.bookingCode,
       confirmationCode: booking.confirmationCode,
@@ -126,6 +157,34 @@ router.post(
       ...req.body,
       createdBy: req.userId,
     });
+
+    // Send booking confirmation notification (async, don't block response)
+    try {
+      const hotel = await Hotel.findById(req.hotelId);
+      const guest = await Guest.findById(booking.guestId);
+      const roomType = await RoomType.findById(booking.roomTypeId);
+      const room = await Room.findById(booking.roomId);
+
+      if (hotel && guest && roomType) {
+        sendBookingConfirmation({
+          guestName: `${guest.firstName} ${guest.lastName}`,
+          guestPhone: guest.phone,
+          guestEmail: guest.email,
+          hotelName: hotel.name,
+          hotelPhone: hotel.contact?.phone || '',
+          bookingCode: booking.bookingCode,
+          confirmationCode: booking.confirmationCode,
+          roomType: roomType.name,
+          roomNumber: room?.roomNumber,
+          checkInDate: dateUtils.format(booking.checkInDate),
+          checkOutDate: dateUtils.format(booking.checkOutDate),
+          totalAmount: booking.pricing.grandTotal.toLocaleString(),
+          currency: booking.pricing.currency,
+        }).catch(err => console.error('[Notification] Failed to send booking confirmation:', err));
+      }
+    } catch (err) {
+      console.error('[Notification] Error preparing booking confirmation:', err);
+    }
 
     return ApiResponse.created(res, booking, 'Booking created');
   })

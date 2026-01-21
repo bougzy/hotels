@@ -14,6 +14,7 @@ import { BookingsPage } from '@/pages/bookings/Bookings';
 import { RoomsPage } from '@/pages/rooms/Rooms';
 import { GuestsPage } from '@/pages/guests/Guests';
 import { SettingsPage } from '@/pages/settings/Settings';
+import { ReportsPage } from '@/pages/reports/Reports';
 
 // Public pages
 import { BookingWidgetPage } from '@/pages/booking-widget/BookingWidget';
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="bookings" element={<BookingsPage />} />
           <Route path="rooms" element={<RoomsPage />} />
           <Route path="guests" element={<GuestsPage />} />
+          <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 

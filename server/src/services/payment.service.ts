@@ -1,7 +1,8 @@
 import { Types } from 'mongoose';
-import { Payment, Booking, Hotel } from '../models/index.js';
+import { Payment, Booking, Hotel, Guest } from '../models/index.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { generateId } from '../utils/helpers.js';
+import { sendPaymentReceipt } from './notification.service.js';
 
 /**
  * PAYSTACK PAYMENT SERVICE
@@ -237,6 +238,30 @@ class PaystackService {
           });
 
           await booking.save();
+
+          // Send payment receipt notification
+          try {
+            const hotel = await Hotel.findById(payment.hotelId);
+            const guest = await Guest.findById(booking.guestId);
+
+            if (hotel && guest) {
+              sendPaymentReceipt({
+                guestName: `${guest.firstName} ${guest.lastName}`,
+                guestEmail: guest.email,
+                hotelName: hotel.name,
+                hotelPhone: hotel.contact?.phone || '',
+                bookingCode: booking.bookingCode,
+                receiptNumber: payment.paymentCode,
+                amountPaid: payment.amount.toLocaleString(),
+                balanceDue: booking.balanceDue,
+                paymentMethod: 'Online (Paystack)',
+                paymentDate: new Date().toLocaleDateString(),
+                currency: payment.currency,
+              }).catch(err => console.error('[Notification] Failed to send payment receipt:', err));
+            }
+          } catch (err) {
+            console.error('[Notification] Error preparing payment receipt:', err);
+          }
         }
       }
     } else {

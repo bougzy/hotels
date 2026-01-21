@@ -3,7 +3,8 @@ import { body, query, param, validationResult } from 'express-validator';
 import { authenticate, requireHotelContext, authorize } from '../middleware/auth.js';
 import { paymentService } from '../services/payment.service.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
-import { Booking, Guest } from '../models/index.js';
+import { Booking, Guest, Hotel } from '../models/index.js';
+import { sendPaymentReceipt } from '../services/notification.service.js';
 
 /**
  * PAYMENT ROUTES
@@ -179,6 +180,31 @@ router.post(
       receiptNumber,
       notes,
     });
+
+    // Send payment receipt notification (async, don't block response)
+    try {
+      const hotel = await Hotel.findById(hotelId);
+      const guest = await Guest.findById(booking.guestId);
+      const updatedBooking = await Booking.findById(bookingId);
+
+      if (hotel && guest && updatedBooking) {
+        sendPaymentReceipt({
+          guestName: `${guest.firstName} ${guest.lastName}`,
+          guestEmail: guest.email,
+          hotelName: hotel.name,
+          hotelPhone: hotel.contact?.phone || '',
+          bookingCode: updatedBooking.bookingCode,
+          receiptNumber: payment.paymentCode,
+          amountPaid: amount.toLocaleString(),
+          balanceDue: updatedBooking.balanceDue,
+          paymentMethod: method,
+          paymentDate: new Date().toLocaleDateString(),
+          currency: updatedBooking.pricing.currency,
+        }).catch(err => console.error('[Notification] Failed to send payment receipt:', err));
+      }
+    } catch (err) {
+      console.error('[Notification] Error preparing payment receipt:', err);
+    }
 
     res.status(201).json({
       success: true,
