@@ -1,14 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import mongoose from 'mongoose';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Create Express app
 const app = express();
@@ -50,8 +45,17 @@ async function connectDB() {
     serverSelectionTimeoutMS: 5000,
   });
   isConnected = true;
-  console.log('MongoDB connected');
 }
+
+// Health check endpoint
+app.get('/api/v1/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
 
 // Routes loaded flag
 let routesLoaded = false;
@@ -59,37 +63,25 @@ let routesLoaded = false;
 async function loadRoutes() {
   if (routesLoaded) return;
 
-  try {
-    // Try multiple import paths for Vercel compatibility
-    let apiRoutes, errorHandler, notFoundHandler;
+  // Import from TypeScript source (Vercel compiles these)
+  const { apiRoutes } = await import('../../server/src/routes/index.js');
+  const { errorHandler, notFoundHandler } = await import('../../server/src/middleware/index.js');
 
-    try {
-      // Path when running in Vercel
-      const routesModule = await import(path.join(__dirname, '../../server/dist/routes/index.js'));
-      const middlewareModule = await import(path.join(__dirname, '../../server/dist/middleware/index.js'));
-      apiRoutes = routesModule.apiRoutes;
-      errorHandler = middlewareModule.errorHandler;
-      notFoundHandler = middlewareModule.notFoundHandler;
-    } catch (e) {
-      // Fallback: direct relative import
-      const routesModule = await import('../../server/dist/routes/index.js');
-      const middlewareModule = await import('../../server/dist/middleware/index.js');
-      apiRoutes = routesModule.apiRoutes;
-      errorHandler = middlewareModule.errorHandler;
-      notFoundHandler = middlewareModule.notFoundHandler;
-    }
+  app.use('/api/v1', apiRoutes);
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
-    // Mount at /api/v1
-    app.use('/api/v1', apiRoutes);
-    app.use(notFoundHandler);
-    app.use(errorHandler);
-
-    routesLoaded = true;
-  } catch (error) {
-    console.error('Failed to load routes:', error);
-    throw error;
-  }
+  routesLoaded = true;
 }
+
+// Simple error handler fallback
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    message: err.message || 'Internal server error'
+  });
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -107,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(500).json({
       success: false,
       message: 'Internal server error',
-      error: String(error)
+      error: error instanceof Error ? error.message : String(error)
     });
   }
 }
