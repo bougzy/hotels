@@ -2,17 +2,10 @@
   "version": 2,
   "buildCommand": "cd client && npm install && npm run build",
   "installCommand": "npm install",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/v1/(.*)",
-      "dest": "/api/v1/[...path]"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/client/dist/index.html"
+      "source": "/api/:path*",
+      "destination": "/api"
     }
   ]
 }
