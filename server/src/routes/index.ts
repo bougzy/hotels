@@ -5,6 +5,7 @@ import { roomRoutes } from './room.routes.js';
 import { bookingRoutes } from './booking.routes.js';
 import { dashboardRoutes } from './dashboard.routes.js';
 import { guestRoutes } from './guest.routes.js';
+import paymentRoutes from './payment.routes.js';
 
 /**
  * API Route Registration
@@ -31,5 +32,6 @@ router.use('/rooms', roomRoutes);
 router.use('/bookings', bookingRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/guests', guestRoutes);
+router.use('/payments', paymentRoutes);
 
 export { router as apiRoutes };

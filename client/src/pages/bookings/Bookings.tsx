@@ -36,6 +36,8 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
+  Banknote,
 } from 'lucide-react';
 
 /**
@@ -123,6 +125,15 @@ export function BookingsPage() {
   const [checkInBooking, setCheckInBooking] = useState<Booking | null>(null);
   const [checkOutBooking, setCheckOutBooking] = useState<Booking | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [paymentBooking, setPaymentBooking] = useState<Booking | null>(null);
+
+  // Payment form state
+  const [paymentForm, setPaymentForm] = useState({
+    amount: 0,
+    method: 'cash' as 'cash' | 'card' | 'bank_transfer' | 'mobile_money' | 'paystack',
+    receiptNumber: '',
+    notes: '',
+  });
 
   // New booking form state
   const [newBooking, setNewBooking] = useState({
@@ -222,6 +233,30 @@ export function BookingsPage() {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['todayOperations'] });
       setCheckOutBooking(null);
+    },
+  });
+
+  // Manual payment mutation
+  const recordPaymentMutation = useMutation({
+    mutationFn: (data: { bookingId: string; amount: number; method: string; receiptNumber?: string; notes?: string }) =>
+      apiClient.post(`/payments/manual?hotelId=${hotel?._id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['todayOperations'] });
+      setPaymentBooking(null);
+      setPaymentForm({ amount: 0, method: 'cash', receiptNumber: '', notes: '' });
+    },
+  });
+
+  // Initialize Paystack payment mutation
+  const initPaystackMutation = useMutation({
+    mutationFn: (data: { bookingId: string; amount: number }) =>
+      apiClient.post<{ authorizationUrl: string; reference: string }>(`/payments/initialize?hotelId=${hotel?._id}`, data),
+    onSuccess: (response) => {
+      // Redirect to Paystack payment page
+      if (response.data?.authorizationUrl) {
+        window.location.href = response.data.authorizationUrl;
+      }
     },
   });
 
@@ -520,6 +555,19 @@ export function BookingsPage() {
                           <Button variant="ghost" size="sm">
                             <Eye className="h-4 w-4" />
                           </Button>
+                          {booking.balanceDue > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPaymentBooking(booking);
+                                setPaymentForm({ ...paymentForm, amount: booking.balanceDue });
+                              }}
+                            >
+                              <CreditCard className="h-4 w-4 mr-1" />
+                              Pay
+                            </Button>
+                          )}
                           {booking.status === 'confirmed' && (
                             <Button
                               variant="outline"
@@ -887,6 +935,157 @@ export function BookingsPage() {
                 </>
               ) : (
                 'Create Booking'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Modal */}
+      <Dialog open={!!paymentBooking} onOpenChange={() => setPaymentBooking(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              {paymentBooking && (
+                <span>
+                  Booking {paymentBooking.bookingCode} - Balance due: {formatCurrency(paymentBooking.balanceDue, paymentBooking.pricing.currency)}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span>Total Amount:</span>
+                <span className="font-medium">
+                  {paymentBooking && formatCurrency(paymentBooking.pricing.grandTotal, paymentBooking.pricing.currency)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Amount Paid:</span>
+                <span className="font-medium text-green-600">
+                  {paymentBooking && formatCurrency(paymentBooking.amountPaid, paymentBooking.pricing.currency)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm border-t mt-2 pt-2">
+                <span>Balance Due:</span>
+                <span className="font-bold text-orange-600">
+                  {paymentBooking && formatCurrency(paymentBooking.balanceDue, paymentBooking.pricing.currency)}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="paymentAmount">Amount to Pay *</Label>
+              <Input
+                id="paymentAmount"
+                type="number"
+                min={1}
+                max={paymentBooking?.balanceDue || 0}
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="paymentMethod">Payment Method *</Label>
+              <select
+                id="paymentMethod"
+                className="w-full h-10 px-3 border rounded-md bg-background"
+                value={paymentForm.method}
+                onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value as any })}
+              >
+                <option value="cash">Cash</option>
+                <option value="card">Card (POS)</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="paystack">Pay Online (Paystack)</option>
+              </select>
+            </div>
+
+            {paymentForm.method !== 'paystack' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="receiptNumber">Receipt Number</Label>
+                  <Input
+                    id="receiptNumber"
+                    placeholder="Optional receipt/reference number"
+                    value={paymentForm.receiptNumber}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, receiptNumber: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="paymentNotes">Notes</Label>
+                  <Input
+                    id="paymentNotes"
+                    placeholder="Optional payment notes"
+                    value={paymentForm.notes}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                  />
+                </div>
+              </>
+            )}
+
+            {paymentForm.method === 'paystack' && (
+              <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
+                <p className="font-medium">Online Payment</p>
+                <p>You will be redirected to Paystack to complete the payment securely.</p>
+              </div>
+            )}
+
+            {(recordPaymentMutation.isError || initPaystackMutation.isError) && (
+              <p className="text-sm text-red-600">
+                Failed to process payment. Please try again.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentBooking(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!paymentBooking) return;
+
+                if (paymentForm.method === 'paystack') {
+                  initPaystackMutation.mutate({
+                    bookingId: paymentBooking._id,
+                    amount: paymentForm.amount,
+                  });
+                } else {
+                  recordPaymentMutation.mutate({
+                    bookingId: paymentBooking._id,
+                    amount: paymentForm.amount,
+                    method: paymentForm.method,
+                    receiptNumber: paymentForm.receiptNumber || undefined,
+                    notes: paymentForm.notes || undefined,
+                  });
+                }
+              }}
+              disabled={
+                !paymentForm.amount ||
+                paymentForm.amount <= 0 ||
+                recordPaymentMutation.isPending ||
+                initPaystackMutation.isPending
+              }
+            >
+              {(recordPaymentMutation.isPending || initPaystackMutation.isPending) ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : paymentForm.method === 'paystack' ? (
+                <>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Pay Online
+                </>
+              ) : (
+                <>
+                  <Banknote className="h-4 w-4 mr-2" />
+                  Record Payment
+                </>
               )}
             </Button>
           </DialogFooter>

@@ -17,6 +17,7 @@ import { SettingsPage } from '@/pages/settings/Settings';
 
 // Public pages
 import { BookingWidgetPage } from '@/pages/booking-widget/BookingWidget';
+import { PaymentCallbackPage } from '@/pages/payment/PaymentCallback';
 
 /**
  * Main App Router
@@ -71,6 +72,9 @@ export default function App() {
 
         {/* Public booking widget - NO AUTH REQUIRED (this is how hotels get direct bookings!) */}
         <Route path="/book/:slug" element={<BookingWidgetPage />} />
+
+        {/* Payment callback - handles Paystack redirect */}
+        <Route path="/payment/callback" element={<PaymentCallbackPage />} />
 
         {/* Protected dashboard routes */}
         <Route

@@ -18,3 +18,10 @@ export {
   type IBookingAddOn,
 } from './Booking.js';
 export { RoomAvailability, type IRoomAvailability } from './RoomAvailability.js';
+export {
+  Payment,
+  type IPayment,
+  type PaymentMethod,
+  type PaymentType,
+  type PaymentGatewayStatus,
+} from './Payment.js';
