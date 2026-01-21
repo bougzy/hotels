@@ -41,7 +41,7 @@ interface AuthState {
   // Actions
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   setHotel: (hotel: Hotel) => void;
   refreshUser: () => Promise<void>;
 }
@@ -135,7 +135,17 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
+      logout: async () => {
+        // Call logout endpoint to invalidate refresh token
+        try {
+          const refreshToken = localStorage.getItem('refreshToken');
+          if (refreshToken) {
+            await apiClient.post('/auth/logout', { refreshToken });
+          }
+        } catch {
+          // Ignore errors - we're logging out anyway
+        }
+
         // Clear tokens
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');

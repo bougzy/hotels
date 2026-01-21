@@ -12,6 +12,8 @@ import { RegisterPage } from '@/pages/auth/Register';
 import { DashboardPage } from '@/pages/dashboard/Dashboard';
 import { BookingsPage } from '@/pages/bookings/Bookings';
 import { RoomsPage } from '@/pages/rooms/Rooms';
+import { GuestsPage } from '@/pages/guests/Guests';
+import { SettingsPage } from '@/pages/settings/Settings';
 
 // Public pages
 import { BookingWidgetPage } from '@/pages/booking-widget/BookingWidget';
@@ -43,18 +45,6 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
-}
-
-// Placeholder pages for routes not yet implemented
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="flex items-center justify-center h-96">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold mb-2">{title}</h2>
-        <p className="text-muted-foreground">This page is under construction</p>
-      </div>
-    </div>
-  );
 }
 
 export default function App() {
@@ -95,8 +85,8 @@ export default function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="bookings" element={<BookingsPage />} />
           <Route path="rooms" element={<RoomsPage />} />
-          <Route path="guests" element={<PlaceholderPage title="Guests" />} />
-          <Route path="settings" element={<PlaceholderPage title="Settings" />} />
+          <Route path="guests" element={<GuestsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
 
         {/* Catch all */}

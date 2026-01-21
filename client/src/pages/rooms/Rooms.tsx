@@ -1,8 +1,23 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Input } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Badge,
+  Input,
+  Label,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui';
 import { formatCurrency, cn } from '@/lib/utils';
 import {
   BedDouble,
@@ -41,9 +56,30 @@ interface Room {
 
 export function RoomsPage() {
   const { hotel } = useAuthStore();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [, setShowAddModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  // Form state for new room
+  const [newRoom, setNewRoom] = useState({
+    roomTypeId: '',
+    roomNumber: '',
+    floor: 1,
+  });
+
+  // Create room mutation
+  const createRoomMutation = useMutation({
+    mutationFn: (data: { roomTypeId: string; roomNumber: string; floor: number }) =>
+      apiClient.post(`/rooms?hotelId=${hotel?._id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['roomSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['roomTypes'] });
+      setShowAddModal(false);
+      setNewRoom({ roomTypeId: '', roomNumber: '', floor: 1 });
+    },
+  });
 
   // Fetch room types
   const { data: roomTypesData } = useQuery({
@@ -337,6 +373,79 @@ export function RoomsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Room Modal */}
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Room</DialogTitle>
+            <DialogDescription>
+              Create a new room in your hotel inventory
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="roomType">Room Type</Label>
+              <select
+                id="roomType"
+                className="w-full h-10 px-3 border rounded-md"
+                value={newRoom.roomTypeId}
+                onChange={(e) => setNewRoom({ ...newRoom, roomTypeId: e.target.value })}
+              >
+                <option value="">Select a room type</option>
+                {roomTypes.map((type) => (
+                  <option key={type._id} value={type._id}>
+                    {type.name} ({type.code})
+                  </option>
+                ))}
+              </select>
+              {roomTypes.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No room types found. Please create a room type first.
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="roomNumber">Room Number</Label>
+              <Input
+                id="roomNumber"
+                placeholder="e.g., 101, 102A"
+                value={newRoom.roomNumber}
+                onChange={(e) => setNewRoom({ ...newRoom, roomNumber: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="floor">Floor</Label>
+              <Input
+                id="floor"
+                type="number"
+                min={0}
+                max={100}
+                value={newRoom.floor}
+                onChange={(e) => setNewRoom({ ...newRoom, floor: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createRoomMutation.mutate(newRoom)}
+              disabled={!newRoom.roomTypeId || !newRoom.roomNumber || createRoomMutation.isPending}
+            >
+              {createRoomMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Room'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

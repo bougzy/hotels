@@ -32,15 +32,34 @@ interface RoomAvailability {
   nights: number;
 }
 
-// HotelInfo interface will be used when public hotel endpoint is implemented
-// interface HotelInfo {
-//   _id: string;
-//   name: string;
-//   slug: string;
-//   contact: { phone: string; email: string; address: {...} };
-//   branding: { logo?: string; primaryColor: string; description?: string };
-//   settings: { currency: string; checkInTime: string; checkOutTime: string };
-// }
+interface HotelInfo {
+  _id: string;
+  name: string;
+  slug: string;
+  type: string;
+  starRating: number;
+  contact: {
+    phone: string;
+    email: string;
+    address: {
+      street?: string;
+      city: string;
+      state?: string;
+      country: string;
+    };
+  };
+  branding: {
+    logo?: string;
+    primaryColor: string;
+    description?: string;
+  };
+  settings: {
+    currency: string;
+    checkInTime: string;
+    checkOutTime: string;
+  };
+  amenities: string[];
+}
 
 type Step = 'dates' | 'rooms' | 'guest' | 'confirm' | 'success';
 
@@ -69,16 +88,17 @@ export function BookingWidgetPage() {
   } | null>(null);
 
   // Fetch hotel info by slug
-  // Will be used when public hotel endpoint is implemented
-  useQuery({
+  const {
+    data: hotelData,
+    isLoading: hotelLoading,
+    error: hotelError,
+  } = useQuery({
     queryKey: ['hotelBySlug', slug],
-    queryFn: async () => {
-      // In real implementation, would have a public endpoint to get hotel by slug
-      // For now, we'll show a placeholder
-      return null;
-    },
+    queryFn: () => apiClient.get<HotelInfo>(`/hotels/public/${slug}`),
     enabled: !!slug,
   });
+
+  const hotel = hotelData?.data;
 
   // Check availability
   const {
@@ -86,10 +106,10 @@ export function BookingWidgetPage() {
     isLoading: availabilityLoading,
     refetch: checkAvailability,
   } = useQuery({
-    queryKey: ['availability', checkIn, checkOut, adults, children],
+    queryKey: ['availability', hotel?._id, checkIn, checkOut, adults, children],
     queryFn: () =>
       apiClient.get<RoomAvailability[]>(
-        `/bookings/availability?hotelId=HOTEL_ID&checkIn=${checkIn}&checkOut=${checkOut}&adults=${adults}&children=${children}`
+        `/bookings/availability?hotelId=${hotel?._id}&checkIn=${checkIn}&checkOut=${checkOut}&adults=${adults}&children=${children}`
       ),
     enabled: false,
   });
@@ -110,7 +130,7 @@ export function BookingWidgetPage() {
   const availability = availabilityData?.data || [];
 
   const handleSearchAvailability = () => {
-    if (checkIn && checkOut) {
+    if (checkIn && checkOut && hotel?._id) {
       checkAvailability();
       setStep('rooms');
     }
@@ -126,8 +146,9 @@ export function BookingWidgetPage() {
   };
 
   const handleConfirmBooking = () => {
+    if (!hotel?._id) return;
     createBooking.mutate({
-      hotelId: 'HOTEL_ID', // Would come from hotelData
+      hotelId: hotel._id,
       roomTypeId: selectedRoom?.roomTypeId,
       checkIn,
       checkOut,
@@ -142,6 +163,35 @@ export function BookingWidgetPage() {
       specialRequests,
     });
   };
+
+  // Loading state for hotel
+  if (hotelLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading hotel information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state - hotel not found
+  if (hotelError || !hotel) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="pt-6">
+            <Hotel className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Hotel Not Found</h2>
+            <p className="text-muted-foreground">
+              The hotel you're looking for doesn't exist or is no longer available.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Success screen
   if (step === 'success' && bookingResult) {
@@ -184,12 +234,18 @@ export function BookingWidgetPage() {
       <header className="bg-white border-b py-4 px-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary rounded-lg">
-              <Hotel className="h-6 w-6 text-primary-foreground" />
-            </div>
+            {hotel.branding?.logo ? (
+              <img src={hotel.branding.logo} alt={hotel.name} className="h-10 w-10 rounded-lg object-cover" />
+            ) : (
+              <div className="p-2 bg-primary rounded-lg">
+                <Hotel className="h-6 w-6 text-primary-foreground" />
+              </div>
+            )}
             <div>
-              <h1 className="font-bold">Hotel Name</h1>
-              <p className="text-xs text-muted-foreground">Book your stay</p>
+              <h1 className="font-bold">{hotel.name}</h1>
+              <p className="text-xs text-muted-foreground">
+                {hotel.contact?.address?.city}, {hotel.contact?.address?.country}
+              </p>
             </div>
           </div>
         </div>

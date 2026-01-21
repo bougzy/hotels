@@ -1,8 +1,22 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
-import { Button, Card, CardContent, Badge, Input } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  Badge,
+  Input,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import {
   Calendar,
@@ -91,11 +105,38 @@ type TabType = 'all' | 'arrivals' | 'departures' | 'in-house';
 
 export function BookingsPage() {
   const { hotel } = useAuthStore();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const limit = 20;
+
+  // Modal states
+  const [checkInBooking, setCheckInBooking] = useState<Booking | null>(null);
+  const [checkOutBooking, setCheckOutBooking] = useState<Booking | null>(null);
+
+  // Check-in mutation
+  const checkInMutation = useMutation({
+    mutationFn: (bookingId: string) =>
+      apiClient.post(`/bookings/${bookingId}/check-in?hotelId=${hotel?._id}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['todayOperations'] });
+      setCheckInBooking(null);
+    },
+  });
+
+  // Check-out mutation
+  const checkOutMutation = useMutation({
+    mutationFn: (bookingId: string) =>
+      apiClient.post(`/bookings/${bookingId}/check-out?hotelId=${hotel?._id}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['todayOperations'] });
+      setCheckOutBooking(null);
+    },
+  });
 
   // Fetch all bookings
   const { data: bookingsData, isLoading: bookingsLoading } = useQuery({
@@ -393,13 +434,21 @@ export function BookingsPage() {
                             <Eye className="h-4 w-4" />
                           </Button>
                           {booking.status === 'confirmed' && (
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCheckInBooking(booking)}
+                            >
                               <LogIn className="h-4 w-4 mr-1" />
                               Check In
                             </Button>
                           )}
                           {booking.status === 'checked_in' && (
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCheckOutBooking(booking)}
+                            >
                               <LogOut className="h-4 w-4 mr-1" />
                               Check Out
                             </Button>
@@ -441,6 +490,88 @@ export function BookingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Check-In Confirmation Dialog */}
+      <AlertDialog open={!!checkInBooking} onOpenChange={() => setCheckInBooking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Check-In</AlertDialogTitle>
+            <AlertDialogDescription>
+              {checkInBooking && (
+                <div className="space-y-2 mt-2">
+                  <p>
+                    <strong>Guest:</strong> {checkInBooking.guest?.firstName} {checkInBooking.guest?.lastName}
+                  </p>
+                  <p>
+                    <strong>Room:</strong> {checkInBooking.room?.roomNumber || 'To be assigned'} ({checkInBooking.roomType?.name})
+                  </p>
+                  <p>
+                    <strong>Dates:</strong> {formatDate(checkInBooking.checkInDate)} - {formatDate(checkInBooking.checkOutDate)}
+                  </p>
+                  <p>
+                    <strong>Booking Code:</strong> {checkInBooking.bookingCode}
+                  </p>
+                  {checkInBooking.balanceDue > 0 && (
+                    <p className="text-orange-600">
+                      <strong>Balance Due:</strong> {formatCurrency(checkInBooking.balanceDue, checkInBooking.pricing.currency)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => checkInBooking && checkInMutation.mutate(checkInBooking._id)}
+              disabled={checkInMutation.isPending}
+            >
+              {checkInMutation.isPending ? 'Processing...' : 'Confirm Check-In'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Check-Out Confirmation Dialog */}
+      <AlertDialog open={!!checkOutBooking} onOpenChange={() => setCheckOutBooking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Check-Out</AlertDialogTitle>
+            <AlertDialogDescription>
+              {checkOutBooking && (
+                <div className="space-y-2 mt-2">
+                  <p>
+                    <strong>Guest:</strong> {checkOutBooking.guest?.firstName} {checkOutBooking.guest?.lastName}
+                  </p>
+                  <p>
+                    <strong>Room:</strong> {checkOutBooking.room?.roomNumber} ({checkOutBooking.roomType?.name})
+                  </p>
+                  <p>
+                    <strong>Check-out Date:</strong> {formatDate(checkOutBooking.checkOutDate)}
+                  </p>
+                  <p>
+                    <strong>Total Amount:</strong> {formatCurrency(checkOutBooking.pricing.grandTotal, checkOutBooking.pricing.currency)}
+                  </p>
+                  {checkOutBooking.balanceDue > 0 && (
+                    <p className="text-orange-600 font-medium">
+                      <strong>Outstanding Balance:</strong> {formatCurrency(checkOutBooking.balanceDue, checkOutBooking.pricing.currency)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => checkOutBooking && checkOutMutation.mutate(checkOutBooking._id)}
+              disabled={checkOutMutation.isPending}
+            >
+              {checkOutMutation.isPending ? 'Processing...' : 'Confirm Check-Out'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -81,6 +81,21 @@ if (config.env === 'development') {
 // Trust proxy (for Vercel/reverse proxies)
 app.set('trust proxy', 1);
 
+// ==================== DATABASE CONNECTION FOR SERVERLESS ====================
+
+// For Vercel serverless, ensure DB is connected before handling requests
+if (process.env.VERCEL) {
+  app.use(async (_req, res, next) => {
+    try {
+      await connectDatabase();
+      next();
+    } catch (error) {
+      console.error('Database connection error:', error);
+      res.status(500).json({ success: false, message: 'Database connection failed' });
+    }
+  });
+}
+
 // ==================== API ROUTES ====================
 
 app.use('/api/v1', apiRoutes);
@@ -154,6 +169,9 @@ const startServer = async () => {
   }
 };
 
-startServer();
+// Only start server if not running in Vercel serverless environment
+if (!process.env.VERCEL) {
+  startServer();
+}
 
 export default app;
