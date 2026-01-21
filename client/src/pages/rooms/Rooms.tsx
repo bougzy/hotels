@@ -60,12 +60,23 @@ export function RoomsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddTypeModal, setShowAddTypeModal] = useState(false);
 
   // Form state for new room
   const [newRoom, setNewRoom] = useState({
     roomTypeId: '',
     roomNumber: '',
     floor: 1,
+  });
+
+  // Form state for new room type
+  const [newRoomType, setNewRoomType] = useState({
+    name: '',
+    code: '',
+    description: '',
+    maxOccupancy: 2,
+    basePrice: 0,
+    amenities: [] as string[],
   });
 
   // Create room mutation
@@ -78,6 +89,33 @@ export function RoomsPage() {
       queryClient.invalidateQueries({ queryKey: ['roomTypes'] });
       setShowAddModal(false);
       setNewRoom({ roomTypeId: '', roomNumber: '', floor: 1 });
+    },
+  });
+
+  // Create room type mutation
+  const createRoomTypeMutation = useMutation({
+    mutationFn: (data: typeof newRoomType) =>
+      apiClient.post(`/rooms/types?hotelId=${hotel?._id}`, {
+        name: data.name,
+        code: data.code,
+        description: data.description,
+        maxOccupancy: data.maxOccupancy,
+        pricing: {
+          basePrice: data.basePrice,
+        },
+        amenities: data.amenities,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roomTypes'] });
+      setShowAddTypeModal(false);
+      setNewRoomType({
+        name: '',
+        code: '',
+        description: '',
+        maxOccupancy: 2,
+        basePrice: 0,
+        amenities: [],
+      });
     },
   });
 
@@ -243,12 +281,28 @@ export function RoomsPage() {
       </div>
 
       {/* Room Types Overview */}
-      {roomTypes.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Room Types</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Room Types</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setShowAddTypeModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Room Type
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {roomTypes.length === 0 ? (
+            <div className="text-center py-8">
+              <BedDouble className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="font-semibold">No room types yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Create room types before adding rooms
+              </p>
+              <Button onClick={() => setShowAddTypeModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Room Type
+              </Button>
+            </div>
+          ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {roomTypes.map((type) => (
                 <div
@@ -267,9 +321,9 @@ export function RoomsPage() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Rooms Grid by Floor */}
       {isLoading ? (
@@ -388,7 +442,7 @@ export function RoomsPage() {
               <Label htmlFor="roomType">Room Type</Label>
               <select
                 id="roomType"
-                className="w-full h-10 px-3 border rounded-md"
+                className="w-full h-10 px-3 border rounded-md bg-background"
                 value={newRoom.roomTypeId}
                 onChange={(e) => setNewRoom({ ...newRoom, roomTypeId: e.target.value })}
               >
@@ -400,7 +454,7 @@ export function RoomsPage() {
                 ))}
               </select>
               {roomTypes.length === 0 && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-orange-600">
                   No room types found. Please create a room type first.
                 </p>
               )}
@@ -441,6 +495,127 @@ export function RoomsPage() {
                 </>
               ) : (
                 'Create Room'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Room Type Modal */}
+      <Dialog open={showAddTypeModal} onOpenChange={setShowAddTypeModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Room Type</DialogTitle>
+            <DialogDescription>
+              Define a new room category for your hotel
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="typeName">Room Type Name *</Label>
+                <Input
+                  id="typeName"
+                  placeholder="e.g., Deluxe Suite"
+                  value={newRoomType.name}
+                  onChange={(e) => setNewRoomType({ ...newRoomType, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="typeCode">Code *</Label>
+                <Input
+                  id="typeCode"
+                  placeholder="e.g., DLX"
+                  value={newRoomType.code}
+                  onChange={(e) => setNewRoomType({ ...newRoomType, code: e.target.value.toUpperCase() })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="typeDescription">Description</Label>
+              <Input
+                id="typeDescription"
+                placeholder="Brief description of this room type"
+                value={newRoomType.description}
+                onChange={(e) => setNewRoomType({ ...newRoomType, description: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="maxOccupancy">Max Occupancy *</Label>
+                <Input
+                  id="maxOccupancy"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={newRoomType.maxOccupancy}
+                  onChange={(e) => setNewRoomType({ ...newRoomType, maxOccupancy: parseInt(e.target.value) || 2 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="basePrice">Base Price/Night *</Label>
+                <Input
+                  id="basePrice"
+                  type="number"
+                  min={0}
+                  placeholder="0.00"
+                  value={newRoomType.basePrice}
+                  onChange={(e) => setNewRoomType({ ...newRoomType, basePrice: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Common Amenities</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {['WiFi', 'TV', 'AC', 'Mini Bar', 'Room Service', 'Safe', 'Balcony', 'Sea View'].map((amenity) => (
+                  <label key={amenity} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={newRoomType.amenities.includes(amenity)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setNewRoomType({ ...newRoomType, amenities: [...newRoomType.amenities, amenity] });
+                        } else {
+                          setNewRoomType({ ...newRoomType, amenities: newRoomType.amenities.filter(a => a !== amenity) });
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    {amenity}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {createRoomTypeMutation.isError && (
+              <p className="text-sm text-red-600">
+                Failed to create room type. Please check all fields and try again.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddTypeModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createRoomTypeMutation.mutate(newRoomType)}
+              disabled={
+                !newRoomType.name ||
+                !newRoomType.code ||
+                newRoomType.basePrice <= 0 ||
+                createRoomTypeMutation.isPending
+              }
+            >
+              {createRoomTypeMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Room Type'
               )}
             </Button>
           </DialogFooter>

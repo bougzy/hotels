@@ -15,6 +15,12 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui';
 import {
   Building,
@@ -25,6 +31,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  Plus,
   Save,
   Users,
 } from 'lucide-react';
@@ -154,6 +161,35 @@ export function SettingsPage() {
     depositPercentage: 0,
     allowChildren: true,
     allowPets: false,
+  });
+
+  // Staff modal state
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [newStaff, setNewStaff] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    phone: '',
+    role: 'receptionist',
+    password: '',
+  });
+
+  // Add staff mutation
+  const addStaffMutation = useMutation({
+    mutationFn: (data: typeof newStaff) =>
+      apiClient.post(`/hotels/${hotel?._id}/staff?hotelId=${hotel?._id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      setShowAddStaffModal(false);
+      setNewStaff({
+        email: '',
+        firstName: '',
+        lastName: '',
+        phone: '',
+        role: 'receptionist',
+        password: '',
+      });
+    },
   });
 
   // Initialize forms when settings load
@@ -676,14 +712,20 @@ export function SettingsPage() {
         {/* Staff Management */}
         <TabsContent value="staff" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Staff Members
-              </CardTitle>
-              <CardDescription>
-                Manage your hotel staff and their access permissions
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Staff Members
+                </CardTitle>
+                <CardDescription>
+                  Manage your hotel staff and their access permissions
+                </CardDescription>
+              </div>
+              <Button onClick={() => setShowAddStaffModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Staff
+              </Button>
             </CardHeader>
             <CardContent>
               {staff.length === 0 ? (
@@ -693,7 +735,10 @@ export function SettingsPage() {
                   <p className="text-muted-foreground mb-4">
                     Add staff members to help manage your hotel
                   </p>
-                  <Button>Add Staff Member</Button>
+                  <Button onClick={() => setShowAddStaffModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Staff Member
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -725,7 +770,8 @@ export function SettingsPage() {
                       </div>
                     </div>
                   ))}
-                  <Button className="w-full" variant="outline">
+                  <Button className="w-full" variant="outline" onClick={() => setShowAddStaffModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
                     Add Staff Member
                   </Button>
                 </div>
@@ -734,6 +780,122 @@ export function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add Staff Modal */}
+      <Dialog open={showAddStaffModal} onOpenChange={setShowAddStaffModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Staff Member</DialogTitle>
+            <DialogDescription>
+              Create a new staff account for your hotel
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="staffFirstName">First Name *</Label>
+                <Input
+                  id="staffFirstName"
+                  placeholder="John"
+                  value={newStaff.firstName}
+                  onChange={(e) => setNewStaff({ ...newStaff, firstName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="staffLastName">Last Name *</Label>
+                <Input
+                  id="staffLastName"
+                  placeholder="Doe"
+                  value={newStaff.lastName}
+                  onChange={(e) => setNewStaff({ ...newStaff, lastName: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="staffEmail">Email *</Label>
+              <Input
+                id="staffEmail"
+                type="email"
+                placeholder="john@example.com"
+                value={newStaff.email}
+                onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="staffPhone">Phone</Label>
+              <Input
+                id="staffPhone"
+                placeholder="+1234567890"
+                value={newStaff.phone}
+                onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="staffRole">Role *</Label>
+              <select
+                id="staffRole"
+                className="w-full h-10 px-3 border rounded-md bg-background"
+                value={newStaff.role}
+                onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
+              >
+                <option value="receptionist">Receptionist</option>
+                <option value="manager">Manager</option>
+                <option value="housekeeping">Housekeeping</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="accountant">Accountant</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="staffPassword">Password *</Label>
+              <Input
+                id="staffPassword"
+                type="password"
+                placeholder="Create a password"
+                value={newStaff.password}
+                onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Minimum 8 characters
+              </p>
+            </div>
+
+            {addStaffMutation.isError && (
+              <p className="text-sm text-red-600">
+                Failed to add staff member. Please check all fields and try again.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddStaffModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => addStaffMutation.mutate(newStaff)}
+              disabled={
+                !newStaff.firstName ||
+                !newStaff.lastName ||
+                !newStaff.email ||
+                !newStaff.password ||
+                newStaff.password.length < 8 ||
+                addStaffMutation.isPending
+              }
+            >
+              {addStaffMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                'Add Staff Member'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
