@@ -1,13 +1,7 @@
 {
   "version": 2,
   "buildCommand": "cd client && npm install && npm run build",
-  "installCommand": "npm install && cd server && npm install",
-  "functions": {
-    "api/**/*.ts": {
-      "maxDuration": 30,
-      "includeFiles": "server/src/**"
-    }
-  },
+  "installCommand": "npm install",
   "routes": [
     {
       "src": "/api/v1/(.*)",
