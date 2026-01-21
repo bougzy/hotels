@@ -47,7 +47,7 @@ async function connectDB() {
   isConnected = true;
 }
 
-// Health check endpoint
+// Health check endpoint (defined before dynamic imports)
 app.get('/api/v1/health', (_req, res) => {
   res.json({
     status: 'ok',
@@ -57,48 +57,78 @@ app.get('/api/v1/health', (_req, res) => {
   });
 });
 
+// Test endpoint
+app.get('/api/v1/test', (_req, res) => {
+  res.json({ message: 'API is working!' });
+});
+
 // Routes loaded flag
 let routesLoaded = false;
+let routeLoadError: Error | null = null;
 
 async function loadRoutes() {
   if (routesLoaded) return;
+  if (routeLoadError) throw routeLoadError;
 
-  // Import from TypeScript source (Vercel compiles these)
-  const { apiRoutes } = await import('../../server/src/routes/index.js');
-  const { errorHandler, notFoundHandler } = await import('../../server/src/middleware/index.js');
+  try {
+    // Try importing the routes - use .js extension as server uses ESM
+    const routesModule = await import('../../server/src/routes/index.js');
+    const middlewareModule = await import('../../server/src/middleware/index.js');
 
-  app.use('/api/v1', apiRoutes);
-  app.use(notFoundHandler);
-  app.use(errorHandler);
+    app.use('/api/v1', routesModule.apiRoutes);
+    app.use(middlewareModule.notFoundHandler);
+    app.use(middlewareModule.errorHandler);
 
-  routesLoaded = true;
+    routesLoaded = true;
+  } catch (error) {
+    console.error('Failed to load routes:', error);
+    routeLoadError = error as Error;
+    // Don't throw - let the basic endpoints work
+  }
 }
 
-// Simple error handler fallback
+// Fallback error handler
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Unhandled error:', err);
+  console.error('Express error:', err);
   res.status(500).json({
     success: false,
     message: err.message || 'Internal server error'
   });
 });
 
+// Catch-all for unmatched routes
+app.use('/api/v1/*', (_req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    routesLoaded,
+    routeLoadError: routeLoadError?.message
+  });
+});
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    // Connect to DB first
     await connectDB();
-    await loadRoutes();
 
-    return new Promise<void>((resolve, reject) => {
-      app(req as unknown as Request, res as unknown as Response, (err?: unknown) => {
-        if (err) reject(err);
-        else resolve();
+    // Try to load routes (non-blocking)
+    try {
+      await loadRoutes();
+    } catch (e) {
+      console.error('Route loading failed:', e);
+    }
+
+    // Handle request with Express
+    return new Promise<void>((resolve) => {
+      app(req as unknown as Request, res as unknown as Response, () => {
+        resolve();
       });
     });
   } catch (error) {
-    console.error('API Handler Error:', error);
+    console.error('Handler error:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Server initialization error',
       error: error instanceof Error ? error.message : String(error)
     });
   }
