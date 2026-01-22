@@ -67,6 +67,10 @@ interface RoomType {
   _id: string;
   name: string;
   code: string;
+  pricing?: {
+    basePrice: number;
+    weekendPrice?: number;
+  };
 }
 
 interface Booking {
