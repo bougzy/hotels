@@ -336,9 +336,11 @@ export function LandingPage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-slate-700 text-white hover:bg-white/5 px-8 py-6 text-lg rounded-xl backdrop-blur-sm transition-all duration-300 hover:border-slate-600"
+                className="group border-2 border-white/30 bg-white/10 text-white hover:bg-white/20 hover:border-white/50 px-8 py-6 text-lg rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:-translate-y-1 shadow-lg shadow-white/5"
               >
-                <Play className="mr-2 h-5 w-5" />
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3 group-hover:bg-white/30 transition-colors">
+                  <Play className="h-5 w-5 fill-white" />
+                </div>
                 Watch Demo
               </Button>
             </div>
