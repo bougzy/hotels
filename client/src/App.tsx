@@ -4,6 +4,9 @@ import { useAuthStore } from '@/stores/auth.store';
 // Layouts
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
+// Landing page
+import { LandingPage } from '@/pages/landing/Landing';
+
 // Auth pages
 import { LoginPage } from '@/pages/auth/Login';
 import { RegisterPage } from '@/pages/auth/Register';
@@ -53,7 +56,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes */}
+        {/* Landing page - public */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Auth routes */}
         <Route
           path="/login"
           element={
@@ -79,14 +85,12 @@ export default function App() {
 
         {/* Protected dashboard routes */}
         <Route
-          path="/"
           element={
             <ProtectedRoute>
               <DashboardLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="bookings" element={<BookingsPage />} />
           <Route path="rooms" element={<RoomsPage />} />
@@ -95,7 +99,7 @@ export default function App() {
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 
-        {/* Catch all */}
+        {/* Catch all - redirect to landing */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
